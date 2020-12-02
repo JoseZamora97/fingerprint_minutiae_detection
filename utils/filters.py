@@ -46,7 +46,8 @@ class GaborFilter:
                 ]
                 im_out[x0:xf, y0:yf] = cv2.filter2D(im_[x0:xf, y0:yf], -1, gabor_rotated_filter)
 
-        # im_out[im_out < 0] = 0
+        im_out[im_out < 0] = 0
+        im_out[im_out > 0] = 255
         # im_out_ = (255 * (im_out - np.min(im_out)) / (np.max(im_out) - np.min(im_out))).astype(np.uint8)
 
-        return 255 - (255 * (im_out - np.min(im_out)) / (np.max(im_out) - np.min(im_out)))
+        return (im_out * mask).astype(np.uint8)

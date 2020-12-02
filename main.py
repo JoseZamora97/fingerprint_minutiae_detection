@@ -4,7 +4,7 @@ import utils
 from crop import plot
 
 # input_img = cv2.imread('./fingerprints_cropped/101_1.tif', cv2.COLOR_BGR2GRAY)
-input_img = cv2.imread('./fingerprints/101_2.tif', cv2.COLOR_BGR2GRAY)
+input_img = cv2.imread('./database/fingerprints/101_2.tif', cv2.COLOR_BGR2GRAY)
 block_size = 16
 
 # normalization -> orientation -> frequency -> mask -> filtering
@@ -24,7 +24,7 @@ im_orientation = utils.OrientationUtils.visualize_angles(mask, im_angles, W=bloc
 gabor_img = utils.GaborFilter.apply(im_norm, im_angles, mask)
 
 # thinning oor get_skeletonization
-thin_image = utils.SkeletonUtils.skeletonize(gabor_img)
+thin_image = utils.SkeletonUtils.skeletonize(gabor_img, mask)
 
 # minutiae
 minutiae = utils.MinutiaeUtils.calculate_minutiae(thin_image)
