@@ -6,7 +6,7 @@ from skimage import morphology as morph
 class SkeletonUtils:
 
     @staticmethod
-    def skeletonize(image_input, mask):
+    def skeletonize(image_input):
         """
         https://scikit-image.org/docs/dev/auto_examples/edges/plot_skeleton.html
         Skeletonization reduces binary objects to 1 pixel wide representations.
@@ -22,4 +22,4 @@ class SkeletonUtils:
         output[morph.skeletonize(image)] = 255
         cv2.bitwise_not(output, output)
 
-        return (output * mask).astype(np.uint8)
+        return output

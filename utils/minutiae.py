@@ -40,11 +40,11 @@ class MinutiaeUtils:
             # if pixel on boundary are crossed with the ridge once, then it is a possible ridge ending
             # if pixel on boundary are crossed with the ridge three times, then it is a ridge bifurcation
             if crossings == 1:
-                return "ending"
+                return "termination"
             if crossings == 3:
                 return "bifurcation"
 
-        return "none"
+        return None
 
     @staticmethod
     def calculate_minutiae(im, kernel_size=3):
@@ -53,13 +53,15 @@ class MinutiaeUtils:
         binary_image = binary_image.astype(np.int8)
 
         (y, x) = im.shape
-        result = im.copy()
-        colors = {"ending": (150, 0, 0), "bifurcation": (0, 150, 0)}
+        result = cv.cvtColor(im.copy(), cv.COLOR_GRAY2RGB)
+        colors = {"termination": (150, 0, 0), "bifurcation": (0, 150, 0)}
 
+        minutaes = []
         for i in range(1, x - kernel_size // 2):
             for j in range(1, y - kernel_size // 2):
                 minutiae = MinutiaeUtils._minutiae_at(binary_image, j, i, kernel_size)
-                if minutiae != "none":
+                if minutiae:
                     cv.circle(result, (i, j), radius=2, color=colors[minutiae], thickness=2)
+                    minutaes.append(((i, j), minutiae))
 
-        return result
+        return result, minutaes

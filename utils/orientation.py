@@ -28,7 +28,7 @@ class OrientationUtils:
                 if radian > mask_threshold:
                     tang = math.tan(angles[(j - 1) // W][(i - 1) // W])
                     begin, end = OrientationUtils._get_line_ends(i, j, W, tang)
-                    cv2.line(result, begin, end, color=150)
+                    cv2.line(result, begin, end, color=(20, 255, 159))
 
         cv2.resize(result, mask.shape, result)
 
