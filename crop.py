@@ -14,7 +14,7 @@ def plot_spec(img, t, save=None):
 
     threshold_values = np.array([t for _ in range(cols.size)])
     plt.plot(cols, 'red', rows, 'blue', threshold_values, 'g--')
-    plt.legend(['col means', 'row means', 'threshold'])
+    plt.legend(['col means', 'row means', 'max_distance'])
 
     if save:
         plt.savefig(save)
@@ -68,7 +68,7 @@ def crop_images(input_directory, output_directory, t):
             cv2.imwrite(f'{output_directory}/{i}', cropped_im)
 
 
-def plot(im, title):
-    plt.imshow(im, cmap='gray')
+def plot(im, title, cmap='gray'):
+    plt.imshow(im, cmap=cmap)
     plt.title(title)
     plt.axis('off'), plt.show()

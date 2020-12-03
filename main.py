@@ -1,30 +1,100 @@
 import os
+from concurrent.futures.thread import ThreadPoolExecutor
 from glob import glob
 from math import sqrt
 
 import cv2
-import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import xmltodict
 from tqdm import tqdm
 
 import utils
-import xmltodict
-import numpy as np
-import matplotlib.pyplot as plt
 
 
-def get_ground_true_annotations(xml_path: str):
-    with open(xml_path) as xml:
-        dict_data = xmltodict.parse(xml.read())
-        objects = [{'type': value['name'], 'box': value['bndbox']} for value in dict_data['annotation']['object']]
-        return objects
+class GroundTruth:
+
+    kind = 'kind'
+    box = 'box'
+
+    annotation_bifurcation = 'bifurcation'
+    annotation_termination = 'termination'
+
+    colors = {
+        annotation_termination: (255, 0, 0),
+        annotation_bifurcation: (0, 255, 0)
+    }
+
+    @staticmethod
+    def load_annotations(xml_path):
+        with open(xml_path) as xml_annotations:
+            data = xmltodict.parse(xml_annotations.read())
+        return [
+            {GroundTruth.kind: value['name'], GroundTruth.box: value['bndbox']}
+            for value in data['annotation']['object']
+        ]
+
+    @classmethod
+    def draw_squares(cls, img: np.array, ground_trues: list):
+        for gt in ground_trues:
+            x0, y0, x, y = gt[GroundTruth.box].values()
+            cv2.rectangle(img, (int(x0), int(y0)), (int(x), int(y)),
+                          cls.colors[gt[GroundTruth.kind]], 2)
+
+        return img
+
+    @classmethod
+    def draw_matches(cls, img: np.array, matches: list):
+        result = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        minutiae_colors = {'termination': (214, 165, 0), 'bifurcation': (5, 94, 0)}
+        colors = {'termination': (255, 0, 0), 'bifurcation': (0, 255, 0)}
+
+        for point, distance, center, kind in matches:
+            cv2.line(result, point, center, (0, 68, 140), 1)
+            cv2.circle(result, point, 5, colors[kind], 1)
+            cv2.circle(result, center, 5, minutiae_colors[kind], 1)
+
+        return result
 
 
-def draw_squares(img: np.array, ground_trues: list):
-    colors = {'termination': (255, 0, 0), 'bifurcation': (0, 255, 0)}
-    for ground_true in ground_trues:
-        x0, y0, x, y = ground_true['box'].values()
-        cv2.rectangle(img, (int(x0), int(y0)), (int(x), int(y)), colors[ground_true['type']], 2)
-    return img
+class FingerprintAnalyzer:
+
+    def __init__(self, ground_truth, minutiae_points):
+        self.ground_truth = ground_truth
+        self.minutiae_points = minutiae_points
+
+    @classmethod
+    def in_circle(cls, center: tuple, point: tuple):
+        distance = sqrt(((point[1] - center[1]) ** 2) + ((point[0] - center[0]) ** 2))
+        return distance
+
+    @classmethod
+    def calculate_center(cls, a0, b0, a, b):
+        return int((int(a0) + int(a)) / 2), int((int(b0) + int(b)) / 2)
+
+    def run_analysis(self, max_distance):
+        centers = []
+
+        for ground_truth in self.ground_truth:
+            x0, y0, x, y = ground_truth[GroundTruth.box].values()
+            centers.append((self.calculate_center(x0, y0, x, y), ground_truth[GroundTruth.kind]))
+
+        matches = []
+        for center, kind in centers:
+            for point, minutiae_kind in self.minutiae_points:
+                if kind == minutiae_kind:
+                    distance = self.in_circle(center, point)
+                    if distance <= max_distance:
+                        matches.append((point, distance, center, minutiae_kind))
+
+        return matches
+
+
+class Pipeline:
+
+    def __init__(self, block_size=16, workers=12):
+        self.block_size = block_size
+        self.job_executor = ThreadPoolExecutor(max_workers=workers)
 
 
 def pipeline(input_img: np.array):
@@ -36,73 +106,38 @@ def pipeline(input_img: np.array):
     im_segmented = mask * im_normalized
     im_norm = utils.NormalizationUtils.std_norm(im_normalized)
 
-    im_angles = utils.OrientationUtils.calculate_angles(im_norm, W=block_size)
-    im_orientation = utils.OrientationUtils.visualize_angles(mask, im_angles, W=block_size)
+    angles = utils.OrientationUtils.calculate_angles(im_norm, W=block_size)
+    im_orientation = utils.OrientationUtils.visualize_angles(mask, angles, W=block_size)
 
-    gabor_img = utils.GaborFilter.apply(im_norm, im_angles, mask)
-
-    thin_image = utils.SkeletonUtils.skeletonize(gabor_img)
-
-    minutiae, minutiae_points = utils.MinutiaeUtils.calculate_minutiae(thin_image)
+    im_gabor = utils.GaborFilter.apply(im_norm, angles, mask)
+    im_skeleton = utils.SkeletonUtils.skeletonize(im_gabor)
+    minutiae, minutiae_points = utils.MinutiaeUtils.calculate_minutiae(im_skeleton)
 
     return dict(im_normalized=im_normalized, im_mask=mask,
                 im_segmented=im_segmented, im_norm=im_norm,
-                im_orientation=im_orientation, im_gabor=gabor_img,
-                im_thin_image=thin_image, im_minutiae=minutiae,
+                im_orientation=im_orientation, im_gabor=im_gabor,
+                im_thin_image=im_skeleton, im_minutiae=minutiae,
                 minutiae_points=minutiae_points)
-
-
-def in_circle(center: tuple, point: tuple):
-    distance = sqrt(((point[1] - center[1]) ** 2) + ((point[0] - center[0]) ** 2))
-    return distance
-
-
-def analysis(ground_trues: list, minutiae_points: list, threshold: int = 15):
-    centers = []
-    center = lambda x0, y0, x, y: (int((int(x0) + int(x)) / 2), int((int(y0) + int(y)) / 2))
-    for ground_truth in ground_trues:
-        x0, y0, x, y = ground_truth['box'].values()
-        centers.append((center(x0, y0, x, y), ground_truth['type']))
-
-    hits = []
-    for center, type in centers:
-        for point, mtype in minutiae_points:
-            if type == mtype:
-                distance = in_circle(center, point)
-                if distance < threshold:
-                    hits.append((point, distance, center, mtype))
-
-    return hits
-
-
-def draw_hits(img: np.array, hits: list):
-    result = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    mcolors = {'termination': (214, 165, 0), 'bifurcation': (5, 94, 0)}
-    colors = {'termination': (255, 0, 0), 'bifurcation': (0, 255, 0)}
-    for point, distance, center, type in hits:
-        cv2.line(result, point, center, (0, 68, 140), 1)
-        cv2.circle(result, point, 5, colors[type], 1)
-        cv2.circle(result, center, 5, mcolors[type], 1)
-    return result
 
 
 def process(file_path: str):
     input_img = cv2.imread(file_path, cv2.COLOR_BGR2GRAY)
-
-    results = pipeline(input_img)
-
     filename, _ = os.path.splitext(file_path)
-    ground_trues = get_ground_true_annotations(f'{filename}.xml')
 
-    hits = analysis(ground_trues, results['minutiae_points'])
+    pipeline_result = pipeline(input_img)
+    gt_annotations = GroundTruth.load_annotations(f'{filename}.xml')
 
-    im_hits = draw_hits(input_img, hits)
+    analyzer = FingerprintAnalyzer(ground_truth=gt_annotations,
+                                   minutiae_points=pipeline_result['minutiae_points'])
 
-    return im_hits, hits, results
+    matches = analyzer.run_analysis(max_distance=20)
+    im_with_matches = GroundTruth.draw_matches(input_img, matches)
+
+    return im_with_matches, matches, pipeline_result
 
 
 def plot(ims_n_titles: list, cols: int, rows: int, title: str, cmap: str, f: tuple = (3.5, 4), output: str = None):
-    fig=plt.figure(figsize=(cols * f[0], rows * f[1]))
+    fig = plt.figure(figsize=(cols * f[0], rows * f[1]))
     fig.suptitle(title, fontsize=16)
 
     i = 1
@@ -121,13 +156,13 @@ def plot(ims_n_titles: list, cols: int, rows: int, title: str, cmap: str, f: tup
         plt.show()
 
 
-def save_results(results: dict, img_name: str, output: str):
-    plot([(v, k) for k, v in results.items()], 4, 2, f'Results - {img_name}', 'gray', output=output)
+def save_results(results_to_save: dict, img_name: str, output: str):
+    plot([(v, k) for k, v in results_to_save.items()], 4, 2, f'Results - {img_name}', 'gray', output=output)
 
 
 if __name__ == '__main__':
     fingerprints_path = './fingerprints/*.tif'
-    results_path = './results.csv'
+    results_path = './results_to_save.csv'
     output_path = './fingerprints_results'
     os.makedirs(output_path, exist_ok=True)
 
@@ -136,8 +171,8 @@ if __name__ == '__main__':
         im_hits, hits, results = process(filepath)
 
         hits_dict[filepath] = (im_hits, hits)
-        del[results['minutiae_points']]
+        del results['minutiae_points']
         save_results(results, os.path.basename(filepath),
                      output_path + '/' + os.path.splitext(os.path.basename(filepath))[0] + '.png')
 
-    pd.DataFrame.from_dict(hits_dict).to_csv(results_path)
+    # TODO: fix: pd.DataFrame.from_dict(hits_dict).to_csv(results_path)
