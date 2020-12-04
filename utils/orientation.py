@@ -17,7 +17,7 @@ class OrientationUtils:
         return begin, end
 
     @staticmethod
-    def visualize_angles(mask, angles, W):
+    def calculate_orientation(mask, angles, W):
         h, w = mask.shape
         result = cv2.cvtColor(np.zeros(mask.shape, np.uint8), cv2.COLOR_GRAY2RGB)
         mask_threshold = (W - 1) ** 2
