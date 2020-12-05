@@ -91,6 +91,8 @@ class MinutiaeUtils:
             if any(map(lambda a: a == 0, [btn_m, bbn_m, bln_m, btn_m])):
                 kind_f = None
 
+            if i == 0 or i == mask.shape[0] or j == 0 or j == mask.shape[1]:
+                kind_f = None
         return kind, kind_f
 
     @staticmethod

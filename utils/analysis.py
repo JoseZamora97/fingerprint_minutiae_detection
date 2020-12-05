@@ -33,7 +33,7 @@ class FingerprintAnalyzer:
             centers.append((self.calculate_center(x0, y0, x, y),
                             ground_truth[utils.GroundTruth.kind]))
 
-        full_matches, matches, misses, used = [], [], [], set()
+        full_matches, matches, misses = [], [], set()
         for center, kind in centers:
             for point, minutiae_kind in self.minutiae_points:
                 distance = self.in_circle(center, point)
@@ -42,9 +42,9 @@ class FingerprintAnalyzer:
                         matches.append((point, distance, center, minutiae_kind))
                     full_matches.append((point, distance, center, minutiae_kind))
                 else:
-                    if point not in used:
-                        misses.append((point, minutiae_kind))
-                used.add(point)
+                    misses.add((point, minutiae_kind))
+
+        misses = list(filter(lambda x: x[0] not in list(map(lambda x: x[0], full_matches)), misses))
 
         return full_matches, matches, misses
 
