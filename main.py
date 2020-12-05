@@ -9,7 +9,7 @@ import utils
 
 # Set up the params
 fingerprints_path = './fingerprints'
-output_path = './test'
+output_path = './results'
 block_size = 16  # Completely tested with 16 (square 16x16 for calculation)
 max_distance = 8  # Threshold to consider a match
 # Create the directory where all will be saved

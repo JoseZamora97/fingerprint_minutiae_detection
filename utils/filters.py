@@ -21,7 +21,6 @@ class GaborFilter:
         angle_increment = 3
         im = np.double(im)
         h, w = im.shape
-        return_img = np.zeros((h, w))
 
         # Generate filters corresponding to these distinct frequencies and
         # orientations in 'angle_increment' increments.
@@ -54,19 +53,16 @@ class GaborFilter:
                 if orientation_index[i][j] > max_orientation_index:
                     orientation_index[i][j] = orientation_index[i][j] - max_orientation_index
 
-        # Find indices of matrix points greater than maxsze from the image boundary
         block_size = int(block_size)
-        valid_row, valid_col = np.where(mask > 0)
-        final_index = \
-            np.where((valid_row > block_size) & (valid_row < h - block_size) & (valid_col > block_size) & (
-                        valid_col < w - block_size))
+        im_padded = np.pad(im, [block_size, block_size], mode='constant')
 
-        for k in range(0, np.shape(final_index)[1]):
-            r = valid_row[final_index[0][k]]
-            c = valid_col[final_index[0][k]]
-            img_block = im[r - block_size:r + block_size + 1][:, c - block_size:c + block_size + 1]
-            return_img[r][c] = np.sum(img_block * gabor_filter[int(orientation_index[r // 16][c // 16]) - 1])
+        img_result = np.zeros((h, w))
 
-        gabor_img = 255 - np.array((return_img < 0) * 255).astype(np.uint8)
+        for r in range(block_size, im.shape[0]):
+            for c in range(block_size, im.shape[1]):
+                img_block = im_padded[r - block_size:r + block_size + 1][:, c - block_size:c + block_size + 1]
+                img_result[r - block_size][c - block_size] = np.sum(img_block * gabor_filter[int(orientation_index[r // 16 - 1][c // 16 - 1]) - 1])
 
-        return gabor_img
+        gabor_img = 255 - np.array((img_result < 0) * 255).astype(np.uint8)
+
+        return 255 - gabor_img * mask
