@@ -44,7 +44,7 @@ class FingerprintAnalyzer:
                 else:
                     misses.add((point, minutiae_kind))
 
-        misses = list(filter(lambda x: x[0] not in list(map(lambda x: x[0], full_matches)), misses))
+        misses = list(filter(lambda i: i[0] not in list(map(lambda j: j[0], full_matches)), misses))
 
         return full_matches, matches, misses
 
