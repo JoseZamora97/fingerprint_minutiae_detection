@@ -44,13 +44,13 @@ class MinutiaeUtils:
     dots_filtered = "dots_filtered"
 
     @classmethod
-    def get_bound_indexes(cls, i, j, size):
+    def get_bound_indexes(cls, i, j, size, w, h):
 
-        bound_top = [(i - size, x) for x in range(j - size, j + size + 1)]
-        bound_bottom = [(i + size, x) for x in range(j - size, j + size + 1)]
+        bound_top = [(max(0, i - size), min(x, w))for x in range(j - size, j + size)]
+        bound_bottom = [(min(h - 1, i + size), min(x, w)) for x in range(j - size, j + size)]
 
-        bound_left = [(x, j - size) for x in range(i - size, i + size + 1)]
-        bound_right = [(x, j + size) for x in range(i - size, i + size + 1)]
+        bound_left = [(min(h - 1, x), max(0, j - size)) for x in range(i - size, i + size + 1)]
+        bound_right = [(min(h - 1, x), min(w - 1, j + size)) for x in range(i - size, i + size + 1)]
 
         return bound_top, bound_bottom, bound_left, bound_right
 
@@ -78,21 +78,23 @@ class MinutiaeUtils:
                 kind = GroundTruth.annotation_bifurcation
                 kind_f = GroundTruth.annotation_bifurcation
 
-            bt, bb, bl, br = cls.get_bound_indexes(i, j, kernel_size * 5)
+            h, w = mask.shape
+            bt, bb, bl, br = cls.get_bound_indexes(i, j, kernel_size * 5, w, h)
 
             btn_m = bbn_m = bln_m = btn_m = 0
 
             for x in range(len(bt)):
-                btn_m += mask[bt[x][0]][bt[x][1]]
-                bbn_m += mask[bb[x][0]][bb[x][1]]
-                bln_m += mask[bl[x][0]][bl[x][1]]
-                btn_m += mask[br[x][0]][br[x][1]]
+                btn_m += mask[bt[x][0], bt[x][1]]
+                bbn_m += mask[bb[x][0], bb[x][1]]
+                bln_m += mask[bl[x][0], bl[x][1]]
+                btn_m += mask[br[x][0], br[x][1]]
 
             if any(map(lambda a: a == 0, [btn_m, bbn_m, bln_m, btn_m])):
                 kind_f = None
 
             if i == 0 or i == mask.shape[0] or j == 0 or j == mask.shape[1]:
                 kind_f = None
+
         return kind, kind_f
 
     @staticmethod

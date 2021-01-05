@@ -53,6 +53,9 @@ def plot_by_kind_percentages(df, subjects, real, output):
     ax.set_xticklabels(subjects)
     ax.legend()
 
+    plt.ylabel('% Pred and G. Truth by Kind')
+    plt.xlabel('Subjects')
+
     plt.savefig(output)
     plt.show()
 
@@ -75,6 +78,9 @@ def plot_by_kind(df, subjects, real, output):
     ax.set_xticklabels(subjects)
     ax.legend()
 
+    plt.ylabel('Pred and G. Truth by Kind')
+    plt.xlabel('Subjects')
+
     plt.savefig(output)
     plt.show()
 
@@ -84,7 +90,7 @@ def get_pred_reals(df, subjects, real):
     predictions = [predictions.get(s) for s in subjects]
     reals = [x + y for x, y in zip(
         real.get('termination'),
-        real.get('termination')
+        real.get('bifurcation')  # TODO: mirar esto
     )]
 
     return predictions, reals
@@ -94,6 +100,7 @@ def plot_by_match(df, subjects, real, output):
     predictions, reals = get_pred_reals(df, subjects, real)
     ind = np.arange(fingerprints_x_subjects)
     width = 0.3
+
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.bar(x=ind, height=predictions, width=width, label='Minutiae Prediction')
@@ -101,6 +108,9 @@ def plot_by_match(df, subjects, real, output):
     ax.set_xticks(ind + width / 2)
     ax.set_xticklabels(subjects)
     ax.legend()
+
+    plt.ylabel('Pred and G. Truth')
+    plt.xlabel('Subjects')
 
     plt.savefig(output)
     plt.show()
@@ -114,48 +124,79 @@ def plot_by_match_percentages(df, subjects, real, output):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.bar(x=ind, height=[p / r if r > 0 else 0 for p, r in zip(predictions, reals)],
-           width=width, label='% Minutiae')
+           width=width, label='% Match Minutiae')
     ax.set_xticks(ind)
     ax.set_xticklabels(subjects)
     ax.legend()
+
+    plt.ylabel('Matches %')
+    plt.xlabel('Subjects')
 
     plt.savefig(output)
     plt.show()
 
 
-def plot_results(dfs, dfs_f, subjects, pipeline_results, out_path):
+def plot_by_misses(df, subjects, output):
+    misses = df['file'].value_counts().to_dict()
+    misses = [misses.get(s) for s in subjects]
+
+    ind = np.arange(fingerprints_x_subjects)
+    width = 0.3
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.bar(x=ind, height=misses, width=width, label='Misses')
+    ax.set_xticks(ind)
+    ax.set_xticklabels(subjects)
+    ax.legend()
+
+    plt.ylabel('Misses')
+    plt.xlabel('Subjects')
+
+    plt.savefig(output)
+    plt.plot()
+
+
+def plot_results(dfs, dfs_f, dfs_m, subjects, pipeline_results, out_path, svg=False):
     for subs in subjects:
         df = dfs[dfs['file'].isin(subs)]
         df_f = dfs_f[dfs_f['file'].isin(subs)]
+        df_m = dfs_m[dfs_m['file'].isin(subs)]
 
-        base_name = f"{out_path}/{subs[0]}_to_{subs[-1]}_{'{}'}.png"
+        os.makedirs(f"{out_path}/{subs[0]}_to_{subs[-1]}/", exist_ok=True)
+        base_name = f"{out_path}/{subs[0]}_to_{subs[-1]}/{'{}'}.{'svg' if svg else 'png'}"
 
         plot_by_kind(df, subs, get_real(pipeline_results, subs),
                      base_name.format("terms_and_bifs"))
         plot_by_kind_percentages(df, subs, get_real(pipeline_results, subs),
                                  base_name.format("terms_and_bifs_percentages"))
+
         plot_by_match(df_f, subs, get_real(pipeline_results, subs),
                       base_name.format("all_matches"))
         plot_by_match_percentages(df_f, subs, get_real(pipeline_results, subs),
                                   base_name.format("all_matches_percentages"))
 
+        plot_by_misses(df_m, subs, base_name.format("misses"))
+
 
 if __name__ == "__main__":
-
     plot_path = "./plots"
-    pipeline_results = './fingerprints_results_pipeline'
+    pipeline_results = './results'
+
     results_path = f'{pipeline_results}/results_matches.csv'
-    results_full_path = f'{pipeline_results}/results_matches.csv'
+    results_full_path = f'{pipeline_results}/results_full_matches.csv'
+    results_misses_path = f'{pipeline_results}/results_misses.csv'
 
     result_dataframe = pd.read_csv(results_path, sep=",")
     result_full_dataframe = pd.read_csv(results_full_path, sep=",")
+    result_misses_dataframe = pd.read_csv(results_misses_path, sep=',')
 
-    subjects = 10
+    subjects = 10  # 10
     fingerprints_x_subjects = 8
     subjects_list = [[f"{100 + i + 1}_{j + 1}"
                       for j in range(fingerprints_x_subjects)]
                      for i in range(subjects)]
 
     os.makedirs(plot_path, exist_ok=True)
-    plot_results(result_dataframe, result_full_dataframe,
-                 subjects_list, pipeline_results, plot_path)
+    plot_results(result_dataframe, result_full_dataframe, result_misses_dataframe,
+                 subjects_list, pipeline_results, plot_path, svg=True)

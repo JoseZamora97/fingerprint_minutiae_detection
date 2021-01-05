@@ -27,9 +27,11 @@ csv_writer_matches.writerow(["file"] + [e for e in utils.FingerprintAnalyzer.hea
 csv_writer_full_matches.writerow(["file"] + [e for e in utils.FingerprintAnalyzer.header_full_matches])
 csv_writer_misses.writerow(["file"] + [e for e in utils.FingerprintAnalyzer.header_misses])
 # Iterate over the whole path finding .tif images
-for filepath in tqdm(glob(f"{fingerprints_path}/*.tif"), desc='Analysing Fingerprints', position=0):
+progress = tqdm(glob(f"{fingerprints_path}/*.tif"), desc='Analysing Fingerprints', position=0)
+for filepath in progress:
     # Extract the fingerprint name
     fingerprint_name = os.path.splitext(os.path.basename(filepath))[0]
+    progress.set_postfix({'File': fingerprint_name})
     path_fingerprint = f"{output_path}/{fingerprint_name}"
     # Create the folder to store the fingerprint analysis results
     os.makedirs(path_fingerprint, exist_ok=True)
@@ -85,7 +87,6 @@ for filepath in tqdm(glob(f"{fingerprints_path}/*.tif"), desc='Analysing Fingerp
     csv_writer_misses.writerows([[fingerprint_name, p[0], p[1], k] for p, k in misses])
     csv_writer_full_matches.writerows([[fingerprint_name, p[0], p[1], d, gt[0], gt[1], k]
                                        for p, d, gt, k in full_matches])
-    break
 
 csv_file_matches.close()
 csv_file_full_matches.close()
